@@ -97,13 +97,31 @@ file_tool = {
   }
 }
 
+bash_tool = {
+  "type": "function",
+  "function": {
+    "name": "Bash",
+    "description": "Execute a shell command after user approval",
+    "parameters": {
+      "type": "object",
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "The command to execute"
+        }
+      }
+    }
+  }
+}
+
 def handle_tool_file(tcall):
     args = json.loads(tcall.function.arguments)
     if not args or not ("file_path" in args):
         return ("Error", "Missing argument 'file_path'")
 
-    result = subprocess.run(['file', args['file_path']], stdout=subprocess.PIPE)
-    return ("Success", result.stdout.decode('utf-8'))
+    result = subprocess.run(['file', args['file_path']], capture_output=True, text=True)
+    return ("Success", result.stdout)
 
 def handle_tool_listdir(tcall):
     args = json.loads(tcall.function.arguments)
@@ -155,6 +173,21 @@ def handle_tool_write(tcall):
     file.close()
     return ("Success", f"Written contents to '{args["file_path"]}'")
 
+def handle_tool_bash(tcall):
+    args = json.loads(tcall.function.arguments)
+    if not args or not ("command" in args):
+        return ("Error", "Missing argument 'command'")
+
+    print(f"Agent wants to execute the command '{args["command"]}'")
+    approval = input("Approve? (y/n): ")
+    if approval.lower() != "y":
+        return ("Error", f"User rejected too execute the command '{args["command"]}'")
+
+    result = subprocess.run(args["command"], shell=True, capture_output=True, text=True)
+    if result.stdout:
+        return ("Success", result.stdout)
+    else:
+        return ("Error", result.stderr)
 
 def handle_tools(completion):
     results = []
@@ -164,6 +197,8 @@ def handle_tools(completion):
             result = handle_tool_read(tcall)
         elif tcall.function.name == "Write":
             result = handle_tool_write(tcall)
+        elif tcall.function.name == "Bash":
+            result = handle_tool_bash(tcall)
         elif tcall.function.name == "Log":
             result = handle_tool_log(tcall)
         elif tcall.function.name == "ListDir":
@@ -178,4 +213,4 @@ def handle_tools(completion):
     return results
 
 
-all_tools = [read_tool, log_tool, listdir_tool, file_tool, write_tool]
+all_tools = [read_tool, log_tool, listdir_tool, file_tool, write_tool, bash_tool]
