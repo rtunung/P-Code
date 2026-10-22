@@ -115,46 +115,38 @@ bash_tool = {
   }
 }
 
-def handle_tool_file(tcall):
-    args = json.loads(tcall.function.arguments)
+def handle_tool_file(args):
     if not args or not ("file_path" in args):
         return ("Error", "Missing argument 'file_path'")
 
     result = subprocess.run(['file', args['file_path']], capture_output=True, text=True)
     return ("Success", result.stdout)
 
-def handle_tool_listdir(tcall):
-    args = json.loads(tcall.function.arguments)
+def handle_tool_listdir(args):
     if not args or not ("directory" in args):
         return ("Error", "Missing argument 'directory'")
 
     return ("Success", json.dumps(os.listdir(args["directory"])))
 
-def handle_tool_log(tcall):
-    args = json.loads(tcall.function.arguments)
+def handle_tool_log(args):
     if not args or not ("log_message" in args):
         return ("Error", "Missing argument 'log_message'")
 
     print(f"LOG: {args["log_message"]}")
     return ("Success", "")
 
-def handle_tool_read(tcall):
-    args = json.loads(tcall.function.arguments)
+def handle_tool_read(args):
     if not args or not ("file_path" in args):
         return ("Error", "Missing argument 'file_path'")
 
-    file = None
     try:
-        file = open(args["file_path"], "r")
+        with open(args["file_path"], "r") as file:
+            content = file.read()
+            return ("Success", content)
     except FileNotFoundError as e:
         return ("Error", e.strerror)
 
-    content = file.read()
-    file.close()
-    return ("Success", content)
-
-def handle_tool_write(tcall):
-    args = json.loads(tcall.function.arguments)
+def handle_tool_write(args):
     if not args or not ("file_path" in args) or not ("content" in args):
         return ("Error", "Missing required arguments 'file_path' or 'content'")
 
@@ -163,18 +155,14 @@ def handle_tool_write(tcall):
     if approval.lower() != "y":
         return ("Error", f"User rejected writting to file '{args["file_path"]}'")
 
-    file = None
     try:
-        file = open(args["file_path"], "w")
+        with open(args["file_path"], "w") as file:
+            file.write(args["content"])
+            return ("Success", f"Written contents to '{args["file_path"]}'")
     except FileNotFoundError as e:
         return ("Error", e.strerror)
 
-    file.write(args["content"])
-    file.close()
-    return ("Success", f"Written contents to '{args["file_path"]}'")
-
-def handle_tool_bash(tcall):
-    args = json.loads(tcall.function.arguments)
+def handle_tool_bash(args):
     if not args or not ("command" in args):
         return ("Error", "Missing argument 'command'")
 
@@ -189,26 +177,29 @@ def handle_tool_bash(tcall):
     else:
         return ("Error", result.stderr)
 
+
+TOOL_MAP = {
+    "Read": handle_tool_read,
+    "Write": handle_tool_write,
+    "Bash": handle_tool_bash,
+    "Log": handle_tool_log,
+    "ListDir": handle_tool_listdir,
+    "FileInfo": handle_tool_file
+}
+
 def handle_tools(completion):
     results = []
     for tcall in completion.choices[0].message.tool_calls:
         result = None
-        if tcall.function.name == "Read":
-            result = handle_tool_read(tcall)
-        elif tcall.function.name == "Write":
-            result = handle_tool_write(tcall)
-        elif tcall.function.name == "Bash":
-            result = handle_tool_bash(tcall)
-        elif tcall.function.name == "Log":
-            result = handle_tool_log(tcall)
-        elif tcall.function.name == "ListDir":
-            result = handle_tool_listdir(tcall)
-        elif tcall.function.name == "FileInfo":
-            result = handle_tool_file(tcall)
+        args = json.loads(tcall.function.arguments)
+
+        handler = TOOL_MAP.get(tcall.function.name)
+        if handler:
+            result = handler(args)
 
         if result != None:
             (status, content) = result
-            results.append({"role": "tool", "tool_call_id": tcall.id, "status": status, "content": content})
+            results.append({"role": "tool", "tool_call_id": tcall.id, "content": f"Status: {status}, Content:{content}"})
 
     return results
 
