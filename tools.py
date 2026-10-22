@@ -20,6 +20,28 @@ read_tool = {
   }
 }
 
+write_tool = {
+    "type": "function",
+    "function": {
+    "name": "Write",
+    "description": "Write content to file after user approval",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "The path to the file to be written"
+        },
+        "content": {
+          "type": "string",
+          "description": "The content to be written"
+        }
+      },
+      "required": ["file_path"]
+    }
+  }
+}
+
 log_tool = {
     "type": "function",
     "function": {
@@ -113,12 +135,35 @@ def handle_tool_read(tcall):
     file.close()
     return ("Success", content)
 
+def handle_tool_write(tcall):
+    args = json.loads(tcall.function.arguments)
+    if not args or not ("file_path" in args) or not ("content" in args):
+        return ("Error", "Missing required arguments 'file_path' or 'content'")
+
+    print(f"Agent wants to write to file '{args["file_path"]}'")
+    approval = input("Approve? (y/n): ")
+    if approval.lower() != "y":
+        return ("Error", f"User rejected writting to file '{args["file_path"]}'")
+
+    file = None
+    try:
+        file = open(args["file_path"], "w")
+    except FileNotFoundError as e:
+        return ("Error", e.strerror)
+
+    file.write(args["content"])
+    file.close()
+    return ("Success", f"Written contents to '{args["file_path"]}'")
+
+
 def handle_tools(completion):
     results = []
     for tcall in completion.choices[0].message.tool_calls:
         result = None
         if tcall.function.name == "Read":
             result = handle_tool_read(tcall)
+        elif tcall.function.name == "Write":
+            result = handle_tool_write(tcall)
         elif tcall.function.name == "Log":
             result = handle_tool_log(tcall)
         elif tcall.function.name == "ListDir":
@@ -133,4 +178,4 @@ def handle_tools(completion):
     return results
 
 
-all_tools = [read_tool, log_tool, listdir_tool, file_tool]
+all_tools = [read_tool, log_tool, listdir_tool, file_tool, write_tool]
