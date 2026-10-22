@@ -77,38 +77,41 @@ file_tool = {
 
 def handle_tool_file(tcall):
     args = json.loads(tcall.function.arguments)
-    if not args or len(args) == 0:
-        raise RuntimeError("No arguments provided")
+    if not args or not ("file_path" in args):
+        return ("Error", "Missing argument 'file_path'")
+
     result = subprocess.run(['file', args['file_path']], stdout=subprocess.PIPE)
-    return result.stdout.decode('utf-8')
+    return ("Success", result.stdout.decode('utf-8'))
 
 def handle_tool_listdir(tcall):
     args = json.loads(tcall.function.arguments)
-    if not args or len(args) == 0:
-        raise RuntimeError("No arguments provided")
-    return json.dumps(os.listdir(args["directory"]))
+    if not args or not ("directory" in args):
+        return ("Error", "Missing argument 'directory'")
+
+    return ("Success", json.dumps(os.listdir(args["directory"])))
 
 def handle_tool_log(tcall):
     args = json.loads(tcall.function.arguments)
-    if not args or len(args) == 0:
-        raise RuntimeError("No arguments provided")
+    if not args or not ("log_message" in args):
+        return ("Error", "Missing argument 'log_message'")
 
     print(f"LOG: {args["log_message"]}")
-    return "Ok"
+    return ("Success", "")
 
 def handle_tool_read(tcall):
-    if tcall.function.name != "Read":
-        raise RuntimeError("Not a read tool call. This should not happen.")
-
     args = json.loads(tcall.function.arguments)
-    if not args or len(args) == 0:
-        raise RuntimeError("No arguments provided")
+    if not args or not ("file_path" in args):
+        return ("Error", "Missing argument 'file_path'")
 
-    file = open(args["file_path"], "r")
+    file = None
+    try:
+        file = open(args["file_path"], "r")
+    except FileNotFoundError as e:
+        return ("Error", e.strerror)
 
     content = file.read()
     file.close()
-    return content
+    return ("Success", content)
 
 def handle_tools(completion):
     results = []
@@ -124,7 +127,8 @@ def handle_tools(completion):
             result = handle_tool_file(tcall)
 
         if result != None:
-            results.append({"role": "tool", "tool_call_id": tcall.id, "content": result})
+            (status, content) = result
+            results.append({"role": "tool", "tool_call_id": tcall.id, "status": status, "content": content})
 
     return results
 
