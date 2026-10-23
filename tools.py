@@ -1,13 +1,32 @@
 import json
 import subprocess
 import os
+from typing import Any
 
-read_tool = {
-    "type": "function",
-    "function": {
-    "name": "Read",
-    "description": "Read and return the contents of a file",
-    "parameters": {
+TOOL_MAP = {}
+ALL_TOOLS = []
+
+def make_tool(name:str, description:str, parameters:dict[str, Any]):
+    def decorator(function):
+        new_tool = {
+            "type": "function",
+            "function": {
+            "name": name,
+            "description": description,
+            "parameters": parameters
+          }
+        }
+        TOOL_MAP[name] = function
+        ALL_TOOLS.append(new_tool)
+
+        return function
+
+    return decorator
+
+@make_tool(
+    name= "Read",
+    description= "Read and return the contents of a file",
+    parameters= {
       "type": "object",
       "properties": {
         "file_path": {
@@ -17,15 +36,22 @@ read_tool = {
       },
       "required": ["file_path"]
     }
-  }
-}
+)
+def handle_tool_read(args):
+    if not args or not ("file_path" in args):
+        return ("Error", "Missing argument 'file_path'")
 
-write_tool = {
-    "type": "function",
-    "function": {
-    "name": "Write",
-    "description": "Write content to file after user approval",
-    "parameters": {
+    try:
+        with open(args["file_path"], "r") as file:
+            content = file.read()
+            return ("Success", content)
+    except FileNotFoundError as e:
+        return ("Error", e.strerror)
+
+@make_tool(
+    name="Write",
+    description="Write content to file after user approval",
+    parameters= {
       "type": "object",
       "properties": {
         "file_path": {
@@ -39,113 +65,7 @@ write_tool = {
       },
       "required": ["file_path"]
     }
-  }
-}
-
-log_tool = {
-    "type": "function",
-    "function": {
-    "name": "Log",
-    "description": "Inform the user about current happenings and activities",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "log_message": {
-          "type": "string",
-          "description": "The message to be logged"
-        }
-      },
-      "required": ["log_message"]
-    }
-  }
-}
-
-
-listdir_tool = {
-    "type": "function",
-    "function": {
-    "name": "ListDir",
-    "description": "List all files in the given directory",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "directory": {
-          "type": "string",
-          "description": "The directory to have it's files displayed"
-        }
-        },
-        "required": ["directory"]
-    }
-  }
-}
-
-file_tool = {
-    "type": "function",
-    "function": {
-    "name": "FileInfo",
-    "description": "Get information about the file type",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "file_path": {
-          "type": "string",
-          "description": "Path to the file to be checked"
-        }
-        },
-        "required": ["file_path"]
-    }
-  }
-}
-
-bash_tool = {
-  "type": "function",
-  "function": {
-    "name": "Bash",
-    "description": "Execute a shell command after user approval",
-    "parameters": {
-      "type": "object",
-      "required": ["command"],
-      "properties": {
-        "command": {
-          "type": "string",
-          "description": "The command to execute"
-        }
-      }
-    }
-  }
-}
-
-def handle_tool_file(args):
-    if not args or not ("file_path" in args):
-        return ("Error", "Missing argument 'file_path'")
-
-    result = subprocess.run(['file', args['file_path']], capture_output=True, text=True)
-    return ("Success", result.stdout)
-
-def handle_tool_listdir(args):
-    if not args or not ("directory" in args):
-        return ("Error", "Missing argument 'directory'")
-
-    return ("Success", json.dumps(os.listdir(args["directory"])))
-
-def handle_tool_log(args):
-    if not args or not ("log_message" in args):
-        return ("Error", "Missing argument 'log_message'")
-
-    print(f"LOG: {args["log_message"]}")
-    return ("Success", "")
-
-def handle_tool_read(args):
-    if not args or not ("file_path" in args):
-        return ("Error", "Missing argument 'file_path'")
-
-    try:
-        with open(args["file_path"], "r") as file:
-            content = file.read()
-            return ("Success", content)
-    except FileNotFoundError as e:
-        return ("Error", e.strerror)
-
+)
 def handle_tool_write(args):
     if not args or not ("file_path" in args) or not ("content" in args):
         return ("Error", "Missing required arguments 'file_path' or 'content'")
@@ -162,6 +82,84 @@ def handle_tool_write(args):
     except FileNotFoundError as e:
         return ("Error", e.strerror)
 
+@make_tool(
+    name="FileInfo",
+    description="Get information about the file type",
+    parameters= {
+      "type": "object",
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "description": "Path to the file to be checked"
+        }
+        },
+        "required": ["file_path"]
+    }
+)
+def handle_tool_file(args):
+    if not args or not ("file_path" in args):
+        return ("Error", "Missing argument 'file_path'")
+
+    result = subprocess.run(['file', args['file_path']], capture_output=True, text=True)
+    return ("Success", result.stdout)
+
+
+@make_tool(
+    name="Log",
+    description="Inform the user about current happenings and activities",
+    parameters={
+      "type": "object",
+      "properties": {
+        "log_message": {
+          "type": "string",
+          "description": "The message to be logged"
+        }
+      },
+      "required": ["log_message"]
+    }
+)
+def handle_tool_log(args):
+    if not args or not ("log_message" in args):
+        return ("Error", "Missing argument 'log_message'")
+
+    print(f"LOG: {args["log_message"]}")
+    return ("Success", "")
+
+
+@make_tool(
+    name="ListDir",
+    description="List all files in the given directory",
+    parameters={
+      "type": "object",
+      "properties": {
+        "directory": {
+          "type": "string",
+          "description": "The directory to have it's files displayed"
+        }
+        },
+        "required": ["directory"]
+    }
+)
+def handle_tool_listdir(args):
+    if not args or not ("directory" in args):
+        return ("Error", "Missing argument 'directory'")
+
+    return ("Success", json.dumps(os.listdir(args["directory"])))
+
+@make_tool(
+    name="Bash",
+    description="Execute a shell command after user approval",
+    parameters= {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "description": "The command to execute"
+        }
+      },
+    "required": ["command"],
+    }
+)
 def handle_tool_bash(args):
     if not args or not ("command" in args):
         return ("Error", "Missing argument 'command'")
@@ -169,7 +167,7 @@ def handle_tool_bash(args):
     print(f"Agent wants to execute the command '{args["command"]}'")
     approval = input("Approve? (y/n): ")
     if approval.lower() != "y":
-        return ("Error", f"User rejected too execute the command '{args["command"]}'")
+        return ("Error", f"User rejected to execute the command '{args["command"]}'")
 
     result = subprocess.run(args["command"], shell=True, capture_output=True, text=True)
     if result.stdout:
@@ -177,15 +175,6 @@ def handle_tool_bash(args):
     else:
         return ("Error", result.stderr)
 
-
-TOOL_MAP = {
-    "Read": handle_tool_read,
-    "Write": handle_tool_write,
-    "Bash": handle_tool_bash,
-    "Log": handle_tool_log,
-    "ListDir": handle_tool_listdir,
-    "FileInfo": handle_tool_file
-}
 
 def handle_tools(completion):
     results = []
@@ -202,6 +191,3 @@ def handle_tools(completion):
             results.append({"role": "tool", "tool_call_id": tcall.id, "content": f"Status: {status}, Content:{content}"})
 
     return results
-
-
-all_tools = [read_tool, log_tool, listdir_tool, file_tool, write_tool, bash_tool]

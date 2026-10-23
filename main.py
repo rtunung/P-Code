@@ -3,7 +3,7 @@ from openai import OpenAI
 from rich.console import Console
 from rich.markdown import Markdown
 
-from tools import all_tools, handle_tools
+from tools import ALL_TOOLS, handle_tools
 
 client = OpenAI(
     api_key="placeholder",
@@ -18,7 +18,7 @@ def call_api(messages):
     completion = client.chat.completions.create(
         model="any",
         messages = messages,
-        tools=all_tools
+        tools=ALL_TOOLS
     )
     return completion
 
