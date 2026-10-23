@@ -2,9 +2,11 @@ import json
 import subprocess
 import os
 from typing import Any
+from utils import truncate_dictionary
 
 TOOL_MAP = {}
 ALL_TOOLS = []
+LOG_TOOL_CALLS = True
 
 def make_tool(name:str, description:str, parameters:dict[str, Any]):
     def decorator(function):
@@ -22,6 +24,7 @@ def make_tool(name:str, description:str, parameters:dict[str, Any]):
         return function
 
     return decorator
+
 
 @make_tool(
     name= "Read",
@@ -47,6 +50,7 @@ def handle_tool_read(args):
             return ("Success", content)
     except FileNotFoundError as e:
         return ("Error", e.strerror)
+
 
 @make_tool(
     name="Write",
@@ -81,6 +85,7 @@ def handle_tool_write(args):
             return ("Success", f"Written contents to '{args["file_path"]}'")
     except FileNotFoundError as e:
         return ("Error", e.strerror)
+
 
 @make_tool(
     name="FileInfo",
@@ -146,6 +151,7 @@ def handle_tool_listdir(args):
 
     return ("Success", json.dumps(os.listdir(args["directory"])))
 
+
 @make_tool(
     name="Bash",
     description="Execute a shell command after user approval",
@@ -179,15 +185,14 @@ def handle_tool_bash(args):
 def handle_tools(completion):
     results = []
     for tcall in completion.choices[0].message.tool_calls:
-        result = None
+        name = tcall.function.name
         args = json.loads(tcall.function.arguments)
 
-        handler = TOOL_MAP.get(tcall.function.name)
+        handler = TOOL_MAP.get(name)
         if handler:
-            result = handler(args)
-
-        if result != None:
-            (status, content) = result
+            if(LOG_TOOL_CALLS) and name != "Log":
+                print(f"SYSTEM LOG: Agent made tool call {name}({truncate_dictionary(args)})")
+            (status, content) = handler(args)
             results.append({"role": "tool", "tool_call_id": tcall.id, "content": f"Status: {status}, Content:{content}"})
 
     return results
