@@ -3,7 +3,7 @@ from openai import OpenAI
 from rich.console import Console
 from rich.markdown import Markdown
 
-from tools import ALL_TOOLS, handle_tools
+from tools import ALL_TOOLS, handle_tools, set_bash_timeout
 
 rich_console = Console()
 
@@ -49,9 +49,10 @@ def interactive_mode(client):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("-p", required=False, help="Run a single given prompt")
-    p.add_argument("-u", required=False, help="Set the base url for OpenAI api")
-    p.add_argument("-k", required=False, help="Set the api key for the OpenAI api")
+    p.add_argument("-p", required=False, help="Run a single given prompt", type=str)
+    p.add_argument("-u", required=False, help="Set the base url for OpenAI api", type=str)
+    p.add_argument("-k", required=False, help="Set the api key for the OpenAI api", type=str)
+    p.add_argument("--bash-timeout", required=False, help="Set the timeout for Bash tool calls", type=float)
     args = p.parse_args()
 
     api_key = "placeholder"
@@ -62,6 +63,9 @@ def main():
 
     if args.k:
         api_key = args.k
+
+    if args.bash_timeout:
+        set_bash_timeout(args.bash_timeout)
 
     client = OpenAI(
         api_key=api_key,

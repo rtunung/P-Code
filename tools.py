@@ -7,6 +7,7 @@ from utils import truncate_dictionary
 TOOL_MAP = {}
 ALL_TOOLS = []
 LOG_TOOL_CALLS = True
+BASH_TIMEOUT = 30.0
 
 def make_tool(name:str, description:str, parameters:dict[str, Any]):
     def decorator(function):
@@ -175,11 +176,14 @@ def handle_tool_bash(args):
     if approval.lower() != "y":
         return ("Error", f"User rejected to execute the command '{args["command"]}'")
 
-    result = subprocess.run(args["command"], shell=True, capture_output=True, text=True)
-    if result.stdout:
-        return ("Success", result.stdout)
-    else:
-        return ("Error", result.stderr)
+    try:
+        result = subprocess.run(args["command"], shell=True, capture_output=True, text=True, timeout=BASH_TIMEOUT)
+        if result.stdout:
+            return ("Success", result.stdout)
+        else:
+            return ("Error", result.stderr)
+    except subprocess.TimeoutExpired as timeout:
+        return ("Error", f"Command timed out after {BASH_TIMEOUT} seconds")
 
 
 def handle_tools(completion):
@@ -196,3 +200,7 @@ def handle_tools(completion):
             results.append({"role": "tool", "tool_call_id": tcall.id, "content": f"Status: {status}, Content:{content}"})
 
     return results
+
+def set_bash_timeout(timeout:float):
+    global BASH_TIMEOUT
+    BASH_TIMEOUT = timeout
