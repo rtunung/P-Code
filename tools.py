@@ -2,7 +2,7 @@ import json
 import subprocess
 import os
 from typing import Any
-from utils import truncate_dictionary
+from utils import truncate_dictionary, logger
 
 TOOL_MAP = {}
 ALL_TOOLS = []
@@ -128,7 +128,7 @@ def handle_tool_log(args):
     if not args or not ("log_message" in args):
         return ("Error", "Missing argument 'log_message'")
 
-    print(f"LOG: {args["log_message"]}")
+    print(f"Agent Activity: {args["log_message"]}")
     return ("Success", "")
 
 
@@ -194,8 +194,8 @@ def handle_tools(completion):
 
         handler = TOOL_MAP.get(name)
         if handler:
-            if(LOG_TOOL_CALLS) and name != "Log":
-                print(f"SYSTEM LOG: Agent made tool call {name}({truncate_dictionary(args)})")
+            if name != "Log":
+                logger.info(f"Agent made tool call {name}({truncate_dictionary(args)})")
             (status, content) = handler(args)
             results.append({"role": "tool", "tool_call_id": tcall.id, "content": f"Status: {status}, Content:{content}"})
 

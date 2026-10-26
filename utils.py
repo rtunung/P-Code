@@ -1,4 +1,7 @@
+import logging
 from transformers import AutoTokenizer
+
+logger = logging.getLogger("p-code")
 
 # Cache for tokenizers to avoid reloading from disk/network on every call
 _TOKENIZER = None
@@ -22,5 +25,5 @@ def count_tokens(text: str, model_name: str):
             _TOKENIZER = AutoTokenizer.from_pretrained(model_name)
         return len(_TOKENIZER.encode(text))
     except OSError as e:
-        print(f"Warning: Tokenizer failed for model {model_name}, using fallback heuristic. Error: {e}")
+        logger.warning(f"Tokenizer failed for model {model_name}, using fallback heuristic. Error: {e}")
         return int(len(text) / 4)
